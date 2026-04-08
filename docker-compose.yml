@@ -1,0 +1,54 @@
+services:
+  # Caddy 反向代理
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+  # FastAPI 后端
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./backend/config.yaml:/app/config.yaml
+      - ./backend/wiki-root:/app/wiki-root
+      - ./backend/data:/app/data
+    environment:
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    expose:
+      - "8000"
+
+  # React 前端（开发模式用 Vite dev server）
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "5173"
+
+  # Cloudflare Tunnel（可选，用于外网域名访问）
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --protocol http2
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    profiles:
+      - tunnel
+
+volumes:
+  caddy_data:
+  caddy_config:

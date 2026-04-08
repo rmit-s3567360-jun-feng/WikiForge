@@ -1,5 +1,6 @@
-"""应用配置管理 — 从 config.yaml 加载"""
+"""应用配置管理 — 从 config.yaml 加载，支持环境变量覆盖"""
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -56,6 +57,17 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
         _config = AppConfig(**data)
     else:
         _config = AppConfig()
+
+    # 环境变量覆盖 API keys（优先级高于 config.yaml）
+    if env_key := os.environ.get("MINIMAX_API_KEY"):
+        _config.llm.cloud_api_key = _config.llm.cloud_api_key or env_key
+        _config.llm.local_api_key = _config.llm.local_api_key or env_key
+    if env_key := os.environ.get("ANTHROPIC_API_KEY"):
+        _config.llm.vision_api_key = _config.llm.vision_api_key or env_key
+    if env_key := os.environ.get("OPENAI_API_KEY"):
+        # 通用 fallback
+        _config.llm.cloud_api_key = _config.llm.cloud_api_key or env_key
+
     return _config
 
 

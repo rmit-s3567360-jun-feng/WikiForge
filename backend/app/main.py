@@ -1,11 +1,14 @@
 """FastAPI 应用入口"""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-from app.config import load_config, get_config
+from app.config import load_config, get_config, BASE_DIR
 from app.models.database import init_db_sync
 
 
@@ -33,7 +36,7 @@ app.add_middleware(
 )
 
 
-# 注册路由
+# 注册 API 路由
 from app.api import ingest, wiki, search  # noqa: E402
 
 app.include_router(ingest.router, prefix="/api", tags=["ingest"])
@@ -49,3 +52,18 @@ async def health():
         "cloud_provider": cfg.llm.cloud_provider,
         "local_provider": cfg.llm.local_provider,
     }
+
+
+# Serve 前端静态文件（production 模式）
+# npm run build 后产物在 frontend/dist/
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """所有非 /api 请求返回 index.html（SPA fallback）"""
+        file_path = FRONTEND_DIST / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_DIST / "index.html")
