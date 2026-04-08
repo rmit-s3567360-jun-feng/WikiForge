@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from app.config import get_wiki_root
 from app.models.database import get_db
 from app.models.schemas import IngestResponse
 from app.ingest.classifier import classify_document
@@ -13,6 +14,8 @@ from app.ingest.vision import describe_image
 from app.wiki.generator import generate_wiki_pages
 from app.wiki.index import rebuild_index
 from app.wiki.topics import update_topic_pages
+from app.search.embeddings import store_embedding
+from app.search.hybrid import index_page_fts
 
 
 def _detect_file_type(file_path: Path) -> str:
@@ -167,7 +170,21 @@ async def run_ingest_pipeline(
     # 8. 重建 index.md
     rebuild_index()
 
-    # 9. 写入数据库
+    # 9. 构建搜索索引（FTS5 + 嵌入向量）
+    wiki_root_path = get_wiki_root()
+    for page_id in wiki_result["pages_created"]:
+        parts = page_id.split("/", 1)
+        if len(parts) == 2:
+            file_path_wiki = wiki_root_path / parts[0] / f"{parts[1]}.md"
+            if file_path_wiki.exists():
+                page_content = file_path_wiki.read_text(encoding="utf-8")
+                page_title = parts[1].replace("-", " ")
+                # FTS5 索引
+                await index_page_fts(page_id, page_title, page_content)
+                # 嵌入向量
+                await store_embedding(page_id, page_content[:2000])
+
+    # 10. 写入数据库
     db = await get_db()
     try:
         await db.execute(
