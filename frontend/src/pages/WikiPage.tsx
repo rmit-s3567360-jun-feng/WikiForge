@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Typography, Spin, Empty } from 'antd'
 import {
   UserOutlined,
@@ -33,21 +33,29 @@ interface WikiTreeItem {
   pages: { page_id: string; title: string; category: string }[]
 }
 
+function convertWikilinks(md: string): string {
+  return md.replace(/\[\[([^\]]+)\]\]/g, (_, target) => {
+    const name = target.split('/').pop() || target
+    return `[${name}](/wiki/${target})`
+  })
+}
+
 export default function WikiPage() {
   const { category, pageName } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [tree, setTree] = useState<WikiTreeItem[]>([])
   const [pageContent, setPageContent] = useState<string>('')
   const [pageTitle, setPageTitle] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
-  // Load wiki tree
+  // Load wiki tree — refetch when navigating back to /wiki
   useEffect(() => {
     fetch('/api/wiki/tree')
       .then((r) => r.json())
       .then(setTree)
       .catch(() => {})
-  }, [])
+  }, [location.pathname])
 
   // Load page content
   useEffect(() => {
@@ -86,8 +94,8 @@ export default function WikiPage() {
 
   const selectedKey = category && pageName ? `${category}/${pageName}` : ''
 
-  // Strip frontmatter from content for display
-  const displayContent = pageContent.replace(/^---[\s\S]*?---\n*/, '')
+  // Strip frontmatter and convert wikilinks for display
+  const displayContent = convertWikilinks(pageContent.replace(/^---[\s\S]*?---\n*/, ''))
 
   return (
     <Layout style={{ background: '#fff', borderRadius: 8, minHeight: '70vh' }}>
@@ -123,24 +131,6 @@ export default function WikiPage() {
               remarkPlugins={[remarkGfm]}
               components={{
                 a: ({ href, children }) => {
-                  // Handle [[wikilink]] style links
-                  const wikiMatch = String(children).match(
-                    /^\[\[(.+?)\]\]$/
-                  )
-                  if (wikiMatch) {
-                    const target = wikiMatch[1]
-                    return (
-                      <a
-                        href={`/wiki/${target}`}
-                        onClick={(e) => {
-                          e.preventDefault()
-                          navigate(`/wiki/${target}`)
-                        }}
-                      >
-                        {target.split('/').pop()}
-                      </a>
-                    )
-                  }
                   if (href?.startsWith('/wiki/')) {
                     return (
                       <a

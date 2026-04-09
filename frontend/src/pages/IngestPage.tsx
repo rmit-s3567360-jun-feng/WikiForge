@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Upload,
   Card,
@@ -51,10 +52,12 @@ function getProgress(status: string): number {
 }
 
 export default function IngestPage() {
+  const navigate = useNavigate()
   const [history, setHistory] = useState<IngestResult[]>([])
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set())
   const [taskMap, setTaskMap] = useState<Record<string, TaskInfo>>({})
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pendingRef = useRef<Set<string>>(new Set())
 
   // 加载历史记录
   useEffect(() => {
@@ -72,10 +75,11 @@ export default function IngestPage() {
         const resp = await fetch('/api/ingest/tasks')
         const allTasks: TaskInfo[] = await resp.json()
 
-        // 只跟踪我们提交的任务
+        // 只跟踪我们提交的任务 — read from ref to avoid stale closure
+        const currentPending = pendingRef.current
         const myTasks: Record<string, TaskInfo> = {}
         for (const t of allTasks) {
-          if (pendingTaskIds.has(t.task_id)) {
+          if (currentPending.has(t.task_id)) {
             myTasks[t.task_id] = t
           }
         }
@@ -101,6 +105,7 @@ export default function IngestPage() {
             setPendingTaskIds(prev => {
               const next = new Set(prev)
               newCompleted.forEach(id => next.delete(id))
+              pendingRef.current = next
               return next
             })
           }, 3000)
@@ -120,7 +125,7 @@ export default function IngestPage() {
         }
       } catch { /* ignore */ }
     }, 1500)
-  }, [pendingTaskIds])
+  }, [])
 
   // pendingTaskIds 变化时管理轮询
   useEffect(() => {
@@ -151,7 +156,11 @@ export default function IngestPage() {
           error: null,
           result: null,
         }
-        setPendingTaskIds(prev => new Set(prev).add(resp.task_id))
+        setPendingTaskIds(prev => {
+          const next = new Set(prev).add(resp.task_id)
+          pendingRef.current = next
+          return next
+        })
         setTaskMap(prev => ({ ...prev, [resp.task_id]: newTask }))
       } else if (status === 'error') {
         const errMsg = info.file.response?.detail || '上传失败'
@@ -260,7 +269,7 @@ export default function IngestPage() {
                 dataSource={r.wiki_pages_created}
                 renderItem={(p) => (
                   <List.Item>
-                    <a href={`/wiki/${p}`}>{p}</a>
+                    <a href={`/wiki/${p}`} onClick={(e) => { e.preventDefault(); navigate(`/wiki/${p}`) }}>{p}</a>
                   </List.Item>
                 )}
               />

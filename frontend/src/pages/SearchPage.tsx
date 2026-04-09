@@ -27,6 +27,7 @@ export default function SearchPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question }),
       })
+      if (!resp.ok) throw new Error(`Server error: ${resp.status}`)
       const data = await resp.json()
       setResult(data)
     } catch {
