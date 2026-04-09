@@ -149,14 +149,64 @@ async def run_ingest_pipeline(
     _update(TaskStatus.SEGMENTING)
     segments = await segment_document(text, headings)
 
-    # 6. Wiki 页面生成
+    # 6. Wiki 页面生成（分段处理超长文档）
     _update(TaskStatus.GENERATING)
-    wiki_result = await generate_wiki_pages(
-        source_id=source_id,
-        filename=filename,
-        content=text,
-        classification=classification,
-    )
+
+    # 合并所有段的结果
+    all_pages_created: list[str] = []
+    all_pages_updated: list[str] = []
+
+    if len(segments) <= 1:
+        # 短文档：整体处理
+        wiki_result = await generate_wiki_pages(
+            source_id=source_id,
+            filename=filename,
+            content=text,
+            classification=classification,
+        )
+        all_pages_created = wiki_result["pages_created"]
+        all_pages_updated = wiki_result["pages_updated"]
+    else:
+        # 长文档：逐段处理，每段独立生成 Wiki 页面
+        for i, seg in enumerate(segments):
+            seg_label = seg.title or f"第{i+1}段"
+            seg_content = seg.content
+            # 每段带上段标题和摘要作为上下文
+            if seg.title:
+                seg_content = f"## {seg.title}\n\n{seg_content}"
+            if seg.summary:
+                seg_content = f"> 段落摘要：{seg.summary}\n\n{seg_content}"
+
+            try:
+                seg_result = await generate_wiki_pages(
+                    source_id=source_id,
+                    filename=f"{filename} (段落: {seg_label})",
+                    content=seg_content,
+                    classification=classification,
+                )
+                # 合并结果，去重
+                for pid in seg_result["pages_created"]:
+                    if pid not in all_pages_created and pid not in all_pages_updated:
+                        all_pages_created.append(pid)
+                for pid in seg_result["pages_updated"]:
+                    if pid not in all_pages_updated:
+                        all_pages_updated.append(pid)
+                    # 如果之前在 created 里，移到 updated（后续段更新了前面段创建的页面）
+                    if pid in all_pages_created:
+                        all_pages_created.remove(pid)
+                        if pid not in all_pages_updated:
+                            all_pages_updated.append(pid)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"段落 {seg_label} Wiki 生成失败: {e}"
+                )
+                continue
+
+    wiki_result = {
+        "pages_created": all_pages_created,
+        "pages_updated": all_pages_updated,
+    }
 
     # 7. 主题聚合页更新（skip if no pages were affected to avoid broken [[]] wikilinks）
     all_affected = wiki_result["pages_created"] + wiki_result["pages_updated"]
