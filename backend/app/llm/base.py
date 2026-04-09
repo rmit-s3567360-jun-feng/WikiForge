@@ -4,6 +4,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 
+class LLMOutputError(Exception):
+    """LLM 返回的内容无法解析为预期格式"""
+    pass
+
+
 class LLMProvider(ABC):
     """所有 LLM provider 的统一接口"""
 

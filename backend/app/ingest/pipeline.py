@@ -158,24 +158,25 @@ async def run_ingest_pipeline(
         classification=classification,
     )
 
-    # 7. 主题聚合页更新
-    source_page_id = (
-        wiki_result["pages_created"][0] if wiki_result["pages_created"] else ""
-    )
-    topic_updates = update_topic_pages(
-        topic_tags=classification.topic_tags,
-        source_page_id=source_page_id,
-        source_filename=filename,
-        summary=classification.summary_one_line,
-    )
+    # 7. 主题聚合页更新（skip if no pages were affected to avoid broken [[]] wikilinks）
+    all_affected = wiki_result["pages_created"] + wiki_result["pages_updated"]
+    topic_updates = []
+    if all_affected:
+        source_page_id = all_affected[0]
+        topic_updates = update_topic_pages(
+            topic_tags=classification.topic_tags,
+            source_page_id=source_page_id,
+            source_filename=filename,
+            summary=classification.summary_one_line,
+        )
 
     # 8. 重建 index.md
     rebuild_index()
 
-    # 9. 构建搜索索引（FTS5 + 嵌入向量）
+    # 9. 构建搜索索引（FTS5 + 嵌入向量）— 新建和更新的页面都需要重建索引
     _update(TaskStatus.INDEXING)
     wiki_root_path = get_wiki_root()
-    for page_id in wiki_result["pages_created"]:
+    for page_id in all_affected:
         parts = page_id.split("/", 1)
         if len(parts) == 2:
             file_path_wiki = wiki_root_path / parts[0] / f"{parts[1]}.md"
@@ -209,7 +210,7 @@ async def run_ingest_pipeline(
             ),
         )
 
-        # 写入 wiki_pages 表
+        # 写入 wiki_pages 表 — 新建页面
         for page_id in wiki_result["pages_created"]:
             parts = page_id.split("/")
             category = parts[0]
@@ -219,6 +220,20 @@ async def run_ingest_pipeline(
                    (page_id, title, category, source_count)
                    VALUES (?, ?, ?, 1)""",
                 (page_id, title, category),
+            )
+            await db.execute(
+                """INSERT OR IGNORE INTO source_page_map (source_id, page_id)
+                   VALUES (?, ?)""",
+                (source_id, page_id),
+            )
+
+        # 更新 wiki_pages 表 — 已有页面追加来源
+        for page_id in wiki_result["pages_updated"]:
+            await db.execute(
+                """UPDATE wiki_pages
+                   SET source_count = source_count + 1
+                   WHERE page_id = ?""",
+                (page_id,),
             )
             await db.execute(
                 """INSERT OR IGNORE INTO source_page_map (source_id, page_id)

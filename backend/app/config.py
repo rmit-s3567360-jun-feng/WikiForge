@@ -60,10 +60,10 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
 
     # 环境变量覆盖 API keys（优先级高于 config.yaml）
     if env_key := os.environ.get("MINIMAX_API_KEY"):
-        _config.llm.cloud_api_key = _config.llm.cloud_api_key or env_key
-        _config.llm.local_api_key = _config.llm.local_api_key or env_key
+        _config.llm.cloud_api_key = env_key
+        _config.llm.local_api_key = env_key
     if env_key := os.environ.get("ANTHROPIC_API_KEY"):
-        _config.llm.vision_api_key = _config.llm.vision_api_key or env_key
+        _config.llm.vision_api_key = env_key
     if env_key := os.environ.get("OPENAI_API_KEY"):
         # 通用 fallback
         _config.llm.cloud_api_key = _config.llm.cloud_api_key or env_key

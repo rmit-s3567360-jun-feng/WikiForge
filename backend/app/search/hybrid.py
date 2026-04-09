@@ -1,5 +1,7 @@
 """混合检索 — BM25 + 向量 + FTS5"""
 
+import sqlite3
+
 import jieba
 from app.models.database import get_db
 from app.search.embeddings import search_by_vector
@@ -35,6 +37,10 @@ async def search_fts(query: str, top_k: int = 10) -> list[tuple[str, float]]:
     """FTS5 全文检索，返回 [(page_id, rank), ...]"""
     tokenized_query = _tokenize_zh(query)
 
+    # If query is empty after tokenization, return empty results
+    if not tokenized_query.strip():
+        return []
+
     db = await get_db()
     try:
         rows = await db.execute_fetchall(
@@ -45,6 +51,9 @@ async def search_fts(query: str, top_k: int = 10) -> list[tuple[str, float]]:
                LIMIT ?""",
             (tokenized_query, top_k),
         )
+    except sqlite3.OperationalError:
+        # FTS5 syntax characters (*, ", OR, AND, NOT) can cause errors
+        return []
     finally:
         await db.close()
 

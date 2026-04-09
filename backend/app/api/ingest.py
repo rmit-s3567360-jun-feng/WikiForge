@@ -55,10 +55,13 @@ async def ingest_file(file: UploadFile = File(...)):
             "或设置环境变量 MINIMAX_API_KEY",
         )
 
-    # 保存上传文件
+    # 保存上传文件（sanitize filename to prevent path traversal）
+    safe_filename = Path(file.filename).name.replace("/", "_").replace("\\", "_")
+    if not safe_filename:
+        raise HTTPException(400, "无效的文件名")
     uploads_dir = get_uploads_dir()
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    file_path = uploads_dir / file.filename
+    file_path = uploads_dir / safe_filename
 
     content = await file.read()
     content_hash = hashlib.sha256(content).hexdigest()
@@ -68,10 +71,10 @@ async def ingest_file(file: UploadFile = File(...)):
 
     # 创建任务，后台执行
     task_id = str(uuid.uuid4())[:12]
-    create_task(task_id, file.filename)
+    create_task(task_id, safe_filename)
     asyncio.create_task(_run_pipeline_background(task_id, file_path, content_hash))
 
-    return {"task_id": task_id, "filename": file.filename, "status": "pending"}
+    return {"task_id": task_id, "filename": safe_filename, "status": "pending"}
 
 
 @router.get("/ingest/status/{task_id}")
@@ -120,22 +123,24 @@ async def get_ingest_history(limit: int = 20):
                LIMIT ?""",
             (limit,),
         )
+
+        # Batch-fetch all page mappings in a single query to avoid N+1
+        source_ids = [row[0] for row in rows]
+        page_map: dict[str, list[str]] = {sid: [] for sid in source_ids}
+        if source_ids:
+            placeholders = ",".join("?" for _ in source_ids)
+            page_rows = await db.execute_fetchall(
+                f"SELECT source_id, page_id FROM source_page_map WHERE source_id IN ({placeholders})",
+                tuple(source_ids),
+            )
+            for pr in page_rows:
+                page_map[pr[0]].append(pr[1])
     finally:
         await db.close()
 
     results = []
     for row in rows:
         source_id = row[0]
-        db2 = await get_db()
-        try:
-            page_rows = await db2.execute_fetchall(
-                "SELECT page_id FROM source_page_map WHERE source_id = ?",
-                (source_id,),
-            )
-        finally:
-            await db2.close()
-
-        pages_created = [r[0] for r in page_rows]
         topic_tags = json.loads(row[3]) if row[3] else []
 
         results.append({
@@ -144,7 +149,7 @@ async def get_ingest_history(limit: int = 20):
             "document_type": row[2] or "unknown",
             "topic_tags": topic_tags,
             "summary": row[4] or "",
-            "wiki_pages_created": pages_created,
+            "wiki_pages_created": page_map.get(source_id, []),
             "wiki_pages_updated": [],
         })
 

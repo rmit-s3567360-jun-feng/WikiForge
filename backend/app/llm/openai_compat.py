@@ -7,7 +7,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from app.llm.base import LLMProvider
+from app.llm.base import LLMProvider, LLMOutputError
 
 # MiniMax M2.x 模型会在输出中嵌入 <think>...</think> 推理块，需要剥离
 _THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
@@ -79,7 +79,20 @@ class OpenAICompatProvider(LLMProvider):
         )
         text = resp.choices[0].message.content or "{}"
         text = _clean_json_text(text)
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # Attempt to extract JSON by finding first { and last }
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    return json.loads(text[start:end + 1])
+                except json.JSONDecodeError:
+                    pass
+            raise LLMOutputError(
+                f"LLM did not return valid JSON: {text[:200]}"
+            )
 
     async def vision(
         self,

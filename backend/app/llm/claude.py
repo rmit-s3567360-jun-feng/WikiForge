@@ -7,7 +7,7 @@ from typing import Any
 
 import anthropic
 
-from app.llm.base import LLMProvider
+from app.llm.base import LLMProvider, LLMOutputError
 
 
 class ClaudeProvider(LLMProvider):
@@ -65,7 +65,20 @@ class ClaudeProvider(LLMProvider):
         text = resp.content[0].text.strip()
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # Attempt to extract JSON by finding first { and last }
+            start = text.find("{")
+            end = text.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    return json.loads(text[start:end + 1])
+                except json.JSONDecodeError:
+                    pass
+            raise LLMOutputError(
+                f"LLM did not return valid JSON: {text[:200]}"
+            )
 
     async def vision(
         self,
