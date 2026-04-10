@@ -89,11 +89,16 @@ You must follow these conventions when generating wiki pages.
 
 Wiki 页面规范：
 - 每个页面以 YAML frontmatter 开头（title, category, source_refs, topic_tags）
-- 使用 [[wikilink]] 语法链接到其他页面
-- source_page 是原始文档的摘要页，放在 sources/ 目录
+- 使用 [[category/page-name]] 语法链接到其他页面
+- source_page 是原始文档的**详细结构化摘要**，放在 sources/ 目录
+  - 必须完整保留原文的所有关键数据、公式、表格、代码、技术细节
+  - 按原文结构组织，使用标题、列表、表格使内容结构化
+  - 不要过度压缩，宁可多保留细节也不要遗漏重要信息
+  - 对原文中的图片引用可以用文字描述替代
 - concept_pages 提取文档中的核心概念（1-3个），放在 concepts/ 目录
+  - 概念页是独立的知识单元，可以被多个文档引用
+  - 内容应该是对该概念的完整解释，不只是引用原文
 - entity_pages 提取重要实体（人/组织/产品），放在 entities/ 目录
-- 内容要精炼、结构化，不是简单复制原文
 - 如果新文档的内容与 index 中已有的页面相关，使用 updates 列表指定对已有页面的更新
 - updates 中的 new_content 应该是完整的重写内容（包含旧信息和新信息的合并）
 - 如果没有需要更新的已有页面，updates 可以为空列表"""
