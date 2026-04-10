@@ -14,6 +14,10 @@ from app.models.schemas import ClassificationResult
 def _sanitize_filename(name: str) -> str:
     """将标题转为合法的文件名"""
     name = name.lower().strip()
+    # 去掉 LLM 可能返回的分类路径前缀（如 "sources/xxx" → "xxx"）
+    for prefix in ("sources/", "concepts/", "entities/", "topics/"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
     name = re.sub(r"[^\w\u4e00-\u9fff\-]", "-", name)
     name = re.sub(r"-+", "-", name)
     return name.strip("-")[:80]
