@@ -55,6 +55,13 @@ WIKI_GENERATE_SYSTEM = """You are a wiki maintainer. Here are the wiki conventio
 
 You must follow these conventions when generating wiki pages.
 
+关键原则：所有内容必须严格来源于用户提供的文档原文。
+- 不要添加文档中没有的信息、数据、观点或推测
+- 不要用你的训练知识补充或扩展原文
+- 如果原文对某个概念只提了一句话，Wiki 页面也只写一句话，不要展开解释
+- 可以重新组织结构和措辞，但事实内容必须来自原文
+- 如果需要标注来源不确定，使用「（原文未明确）」标记
+
 输出严格 JSON 格式（{schema}）：
 {{
   "source_page": {{
@@ -97,7 +104,8 @@ Wiki 页面规范：
   - 对原文中的图片引用可以用文字描述替代
 - concept_pages 提取文档中的核心概念（1-3个），放在 concepts/ 目录
   - 概念页是独立的知识单元，可以被多个文档引用
-  - 内容应该是对该概念的完整解释，不只是引用原文
+  - 内容必须完全基于原文中对该概念的描述，不要用外部知识补充
+  - 保留原文的技术细节、数据和论述逻辑
 - entity_pages 提取重要实体（人/组织/产品），放在 entities/ 目录
 - 如果新文档的内容与 index 中已有的页面相关，使用 updates 列表指定对已有页面的更新
 - updates 中的 new_content 应该是完整的重写内容（包含旧信息和新信息的合并）
