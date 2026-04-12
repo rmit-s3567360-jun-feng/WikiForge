@@ -23,6 +23,11 @@ class LLMConfig(BaseModel):
     vision_model: str = "claude-sonnet-4-6"
     vision_api_key: str = ""
 
+    eval_provider: str = "ollama"
+    eval_model: str = "qwen3.5:9b"
+    eval_api_key: str = "ollama"
+    eval_base_url: str = "http://localhost:11434"
+
     embedding_model: str = "BAAI/bge-small-zh-v1.5"
 
 

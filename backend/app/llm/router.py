@@ -15,7 +15,7 @@ TASK_ROUTING = {
     "wiki_generate": "cloud",
     "vision": "vision",
     "query": "cloud",
-    "eval": "local",
+    "eval": "eval",
 }
 
 # Provider 单例缓存
@@ -66,6 +66,14 @@ def get_provider(task: str) -> LLMProvider:
                 api_key=api_key,
                 base_url=cfg.local_base_url,
                 model=cfg.local_model,
+            )
+        elif provider_type == "eval":
+            _providers[cache_key] = _build_provider(
+                "eval",
+                cfg.eval_provider,
+                api_key=cfg.eval_api_key,
+                base_url=cfg.eval_base_url,
+                model=cfg.eval_model,
             )
         elif provider_type == "vision":
             _providers[cache_key] = _build_provider(
