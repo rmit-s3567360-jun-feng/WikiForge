@@ -15,6 +15,7 @@ TASK_ROUTING = {
     "wiki_generate": "cloud",
     "vision": "vision",
     "query": "cloud",
+    "eval": "local",
 }
 
 # Provider 单例缓存

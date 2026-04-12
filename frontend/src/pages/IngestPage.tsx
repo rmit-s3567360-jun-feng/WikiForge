@@ -26,6 +26,13 @@ import type { UploadProps } from 'antd'
 const { Dragger } = Upload
 const { Title, Text } = Typography
 
+interface EvalReport {
+  faithfulness: number
+  completeness: number
+  issues: { type: string; severity: string; detail: string }[]
+  summary: string
+}
+
 interface IngestResult {
   source_id: string
   filename: string
@@ -34,6 +41,7 @@ interface IngestResult {
   summary: string
   wiki_pages_created: string[]
   wiki_pages_updated: string[]
+  eval_report?: EvalReport | null
 }
 
 interface TaskInfo {
@@ -348,6 +356,25 @@ export default function IngestPage() {
                     ))}
                   </Descriptions.Item>
                   <Descriptions.Item label="摘要">{r.summary}</Descriptions.Item>
+                  {r.eval_report && r.eval_report.faithfulness > 0 && (
+                    <Descriptions.Item label="质量评估">
+                      <span style={{ marginRight: 12 }}>
+                        忠实度 <Tag color={r.eval_report.faithfulness >= 4 ? 'green' : r.eval_report.faithfulness >= 3 ? 'orange' : 'red'}>{r.eval_report.faithfulness}/5</Tag>
+                      </span>
+                      <span>
+                        完整度 <Tag color={r.eval_report.completeness >= 4 ? 'green' : r.eval_report.completeness >= 3 ? 'orange' : 'red'}>{r.eval_report.completeness}/5</Tag>
+                      </span>
+                      {r.eval_report.issues.length > 0 && (
+                        <div style={{ marginTop: 4 }}>
+                          {r.eval_report.issues.map((issue, i) => (
+                            <div key={i} style={{ fontSize: 12, color: issue.severity === 'high' ? '#ff4d4f' : '#666' }}>
+                              [{issue.type}] {issue.detail}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Descriptions.Item>
+                  )}
                 </Descriptions>
                 {r.wiki_pages_created.length > 0 && (
                   <div style={{ marginTop: 8 }}>
@@ -370,6 +397,12 @@ export default function IngestPage() {
                 <Text ellipsis style={{ flex: 1, color: '#666' }}>
                   {r.summary?.length > 60 ? r.summary.slice(0, 60) + '…' : r.summary}
                 </Text>
+                {r.eval_report && r.eval_report.faithfulness > 0 && (
+                  <span style={{ whiteSpace: 'nowrap' }}>
+                    <Tag color={r.eval_report.faithfulness >= 4 ? 'green' : r.eval_report.faithfulness >= 3 ? 'orange' : 'red'} style={{ marginRight: 2 }}>{r.eval_report.faithfulness}</Tag>
+                    <Tag color={r.eval_report.completeness >= 4 ? 'green' : r.eval_report.completeness >= 3 ? 'orange' : 'red'}>{r.eval_report.completeness}</Tag>
+                  </span>
+                )}
               </div>
             )}
           </Card>

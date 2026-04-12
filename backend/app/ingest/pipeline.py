@@ -347,6 +347,19 @@ async def run_ingest_pipeline(
     from app.search.bm25_index import build_bm25_index
     build_bm25_index()
 
+    # 14. 质量评估（本地模型）
+    eval_report = None
+    try:
+        from app.eval.evaluator import eval_ingest
+        eval_report = await eval_ingest(
+            source_id=source_id,
+            source_text=text,
+            pages_created=wiki_result["pages_created"],
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Eval 失败: {e}")
+
     # Combine wiki pages that were merged with topic page updates
     all_updated = wiki_result["pages_updated"] + topic_updates
 
@@ -358,4 +371,5 @@ async def run_ingest_pipeline(
         summary=classification.summary_one_line,
         wiki_pages_created=wiki_result["pages_created"],
         wiki_pages_updated=all_updated,
+        eval_report=eval_report,
     )

@@ -16,6 +16,7 @@ class IngestResponse(BaseModel):
     summary: str
     wiki_pages_created: list[str]
     wiki_pages_updated: list[str]
+    eval_report: Optional[dict] = None
 
 
 # --- Wiki ---

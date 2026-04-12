@@ -25,3 +25,10 @@ async def lint_report():
     if _last_report is None:
         return {"message": "尚未运行过检查，请先调用 POST /api/lint/run"}
     return _last_report
+
+
+@router.get("/eval-stats")
+async def eval_stats():
+    """获取导入质量评估汇总"""
+    from app.eval.evaluator import get_all_eval_stats
+    return await get_all_eval_stats()

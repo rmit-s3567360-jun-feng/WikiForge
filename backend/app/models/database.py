@@ -98,6 +98,17 @@ CREATE VIRTUAL TABLE IF NOT EXISTS wiki_fts USING fts5(
     tokenize = "unicode61"
 );
 
+-- 导入质量评估报告
+CREATE TABLE IF NOT EXISTS eval_reports (
+    source_id       TEXT PRIMARY KEY,
+    faithfulness    INTEGER DEFAULT 0,
+    completeness    INTEGER DEFAULT 0,
+    issues          TEXT,           -- JSON array
+    summary         TEXT,
+    evaluated_at    DATETIME DEFAULT (datetime('now')),
+    FOREIGN KEY (source_id) REFERENCES sources(source_id)
+);
+
 -- 操作日志
 CREATE TABLE IF NOT EXISTS operation_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

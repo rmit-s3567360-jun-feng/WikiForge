@@ -34,6 +34,7 @@ async def _run_pipeline_background(task_id: str, file_path: Path, content_hash: 
             "summary": result.summary,
             "wiki_pages_created": result.wiki_pages_created,
             "wiki_pages_updated": result.wiki_pages_updated,
+            "eval_report": result.eval_report,
         })
     except Exception as e:
         traceback.print_exc()
@@ -265,6 +266,7 @@ async def get_ingest_history(limit: int = 20):
         # Batch-fetch all page mappings in a single query to avoid N+1
         source_ids = [row[0] for row in rows]
         page_map: dict[str, list[str]] = {sid: [] for sid in source_ids}
+        eval_map: dict[str, dict | None] = {sid: None for sid in source_ids}
         if source_ids:
             placeholders = ",".join("?" for _ in source_ids)
             page_rows = await db.execute_fetchall(
@@ -273,6 +275,18 @@ async def get_ingest_history(limit: int = 20):
             )
             for pr in page_rows:
                 page_map[pr[0]].append(pr[1])
+            # Batch-fetch eval reports
+            eval_rows = await db.execute_fetchall(
+                f"SELECT source_id, faithfulness, completeness, issues, summary FROM eval_reports WHERE source_id IN ({placeholders})",
+                tuple(source_ids),
+            )
+            for er in eval_rows:
+                eval_map[er[0]] = {
+                    "faithfulness": er[1],
+                    "completeness": er[2],
+                    "issues": json.loads(er[3]) if er[3] else [],
+                    "summary": er[4],
+                }
     finally:
         await db.close()
 
@@ -289,6 +303,7 @@ async def get_ingest_history(limit: int = 20):
             "summary": row[4] or "",
             "wiki_pages_created": page_map.get(source_id, []),
             "wiki_pages_updated": [],
+            "eval_report": eval_map.get(source_id),
         })
 
     return results

@@ -144,3 +144,40 @@ VISION_DIAGRAM = """描述这张架构图/流程图：
 用中文回答，简洁准确。"""
 
 VISION_GENERAL = """简要描述这张图片的内容（1-2句话），用中文。"""
+
+# --- Eval ---
+
+EVAL_SYSTEM = """你是一个文档质量审核员。你的任务是对比原始文档和生成的 Wiki 页面，检查忠实度和完整度。
+
+输出严格 JSON 格式：
+{
+  "faithfulness": 1-5,
+  "completeness": 1-5,
+  "issues": [
+    {
+      "type": "hallucination|omission|distortion",
+      "severity": "high|medium|low",
+      "detail": "具体描述问题"
+    }
+  ],
+  "summary": "一句话总结评估结果"
+}
+
+评分标准：
+- faithfulness（忠实度）：Wiki 页面中的事实是否都有原文支撑
+  5=完全忠实 4=极少偏差 3=有少量编造 2=多处编造 1=严重失实
+- completeness（完整度）：原文的关键信息是否被充分提取
+  5=完整提取 4=遗漏次要细节 3=遗漏部分要点 2=大量遗漏 1=严重不完整
+
+issues 类型：
+- hallucination：Wiki 中出现了原文没有的事实/数据
+- omission：原文的重要内容被遗漏
+- distortion：原文的信息被曲解或改变了含义"""
+
+EVAL_USER = """对比以下原始文档和生成的 Wiki 页面，评估质量：
+
+## 原始文档（前 3000 字）
+{source_text}
+
+## 生成的 Wiki 页面（source_page）
+{wiki_content}"""
