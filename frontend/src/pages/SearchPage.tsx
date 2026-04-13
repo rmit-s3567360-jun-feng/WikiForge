@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Input, Card, Typography, List, Spin, Empty, Button, message } from 'antd'
+import { Input, Card, Typography, List, Spin, Empty, Button, message, Tabs, Tag } from 'antd'
 import { SearchOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -20,11 +20,27 @@ interface QueryResult {
   suggested_page?: SuggestedPage | null
 }
 
+interface SearchResultItem {
+  page_id: string
+  title: string
+  snippet: string
+  score: number
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  sources: '#87d068',
+  entities: '#108ee9',
+  concepts: '#f50',
+  topics: '#722ed1',
+}
+
 export default function SearchPage() {
   const [result, setResult] = useState<QueryResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [lastQuestion, setLastQuestion] = useState('')
+  const [quickResults, setQuickResults] = useState<SearchResultItem[]>([])
+  const [quickLoading, setQuickLoading] = useState(false)
   const navigate = useNavigate()
 
   const handleArchive = async (page: SuggestedPage) => {
@@ -71,10 +87,89 @@ export default function SearchPage() {
     }
   }
 
-  return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <Title level={3}>搜索问答</Title>
+  const handleQuickSearch = async (keyword: string) => {
+    if (!keyword.trim()) return
+    setQuickLoading(true)
+    try {
+      const resp = await fetch('/api/search/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: keyword, top_k: 10 }),
+      })
+      if (!resp.ok) throw new Error(`Server error: ${resp.status}`)
+      const data = await resp.json()
+      setQuickResults(data)
+    } catch {
+      message.error('搜索失败，请检查后端服务')
+      setQuickResults([])
+    } finally {
+      setQuickLoading(false)
+    }
+  }
 
+  const quickSearchTab = (
+    <div>
+      <Search
+        placeholder="输入关键词搜索 Wiki 页面"
+        enterButton="搜索"
+        size="large"
+        prefix={<SearchOutlined />}
+        onSearch={handleQuickSearch}
+        loading={quickLoading}
+        style={{ marginBottom: 24 }}
+      />
+
+      {quickLoading && (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <Spin size="large" />
+        </div>
+      )}
+
+      {quickResults.length > 0 && !quickLoading && (
+        <List
+          dataSource={quickResults}
+          renderItem={(item) => {
+            const category = item.page_id.split('/')[0]
+            return (
+              <List.Item
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/wiki/${item.page_id}`)}
+              >
+                <List.Item.Meta
+                  title={
+                    <span>
+                      {item.title}
+                      <Tag
+                        color={CATEGORY_COLORS[category] || '#999'}
+                        style={{ marginLeft: 8 }}
+                      >
+                        {category}
+                      </Tag>
+                      <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
+                        {Math.round(item.score * 100)}%
+                      </span>
+                    </span>
+                  }
+                  description={
+                    <Paragraph ellipsis={{ rows: 2 }} style={{ marginBottom: 0, color: '#666' }}>
+                      {item.snippet}
+                    </Paragraph>
+                  }
+                />
+              </List.Item>
+            )
+          }}
+        />
+      )}
+
+      {quickResults.length === 0 && !quickLoading && (
+        <Empty description="输入关键词开始搜索" style={{ marginTop: 60 }} />
+      )}
+    </div>
+  )
+
+  const qaTab = (
+    <div>
       <Search
         placeholder="输入你的问题，例如：关于 Transformer 的核心贡献是什么？"
         enterButton="提问"
@@ -145,6 +240,19 @@ export default function SearchPage() {
       {!result && !loading && (
         <Empty description="输入问题开始搜索" style={{ marginTop: 60 }} />
       )}
+    </div>
+  )
+
+  return (
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <Title level={3}>搜索</Title>
+      <Tabs
+        defaultActiveKey="quick"
+        items={[
+          { key: 'quick', label: '快速搜索', children: quickSearchTab },
+          { key: 'qa', label: 'AI 问答', children: qaTab },
+        ]}
+      />
     </div>
   )
 }

@@ -1,9 +1,10 @@
 """混合检索 — BM25 + 向量 + FTS5"""
 
+import asyncio
 import sqlite3
 
 import jieba
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 from app.search.embeddings import search_by_vector
 from app.search.bm25_index import search_bm25
 
@@ -19,8 +20,7 @@ async def index_page_fts(page_id: str, title: str, content: str) -> None:
     tokenized_title = _tokenize_zh(title)
     tokenized_content = _tokenize_zh(content)
 
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         # 先删除旧记录
         await db.execute(
             "DELETE FROM wiki_fts WHERE page_id = ?", (page_id,)
@@ -29,9 +29,6 @@ async def index_page_fts(page_id: str, title: str, content: str) -> None:
             "INSERT INTO wiki_fts (page_id, title, content) VALUES (?, ?, ?)",
             (page_id, tokenized_title, tokenized_content),
         )
-        await db.commit()
-    finally:
-        await db.close()
 
 
 async def search_fts(query: str, top_k: int = 10) -> list[tuple[str, float]]:
@@ -42,21 +39,19 @@ async def search_fts(query: str, top_k: int = 10) -> list[tuple[str, float]]:
     if not tokenized_query.strip():
         return []
 
-    db = await get_db()
     try:
-        rows = await db.execute_fetchall(
-            """SELECT page_id, rank
-               FROM wiki_fts
-               WHERE wiki_fts MATCH ?
-               ORDER BY rank
-               LIMIT ?""",
-            (tokenized_query, top_k),
-        )
+        async with get_db_ctx() as db:
+            rows = await db.execute_fetchall(
+                """SELECT page_id, rank
+                   FROM wiki_fts
+                   WHERE wiki_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT ?""",
+                (tokenized_query, top_k),
+            )
     except sqlite3.OperationalError:
         # FTS5 syntax characters (*, ", OR, AND, NOT) can cause errors
         return []
-    finally:
-        await db.close()
 
     # FTS5 rank 是负数，绝对值越小越相关
     return [(row[0], -row[1]) for row in rows]
@@ -73,10 +68,11 @@ async def hybrid_search(
 
     返回 [(page_id, combined_score), ...] 按分数降序。
     """
-    # BM25 关键词检索（替代 FTS5）
-    bm25_results = search_bm25(query, top_k=top_k * 2)
-    # 向量语义检索
-    vec_results = await search_by_vector(query, top_k=top_k * 2)
+    # BM25 关键词检索 + 向量语义检索（并行执行）
+    bm25_results, vec_results = await asyncio.gather(
+        asyncio.to_thread(search_bm25, query, top_k * 2),
+        search_by_vector(query, top_k=top_k * 2),
+    )
 
     # 归一化分数到 [0, 1]
     def _normalize(results: list[tuple[str, float]]) -> dict[str, float]:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pathlib import Path
 
 from app.config import get_wiki_root
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 from app.models.schemas import WikiPageDetail, WikiTree, WikiPageSummary
 
 router = APIRouter()
@@ -79,8 +79,7 @@ async def get_index():
 async def get_backlinks(category: str, page_name: str):
     """获取引用了指定页面的所有其他页面"""
     page_id = f"{category}/{page_name}"
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         rows = await db.execute_fetchall(
             """SELECT pr.from_page_id, pr.context, wp.title
                FROM page_refs pr
@@ -93,5 +92,3 @@ async def get_backlinks(category: str, page_name: str):
             {"page_id": row[0], "context": row[1], "title": row[2]}
             for row in rows
         ]
-    finally:
-        await db.close()

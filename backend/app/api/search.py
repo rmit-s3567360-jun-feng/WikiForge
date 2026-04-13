@@ -5,7 +5,7 @@ import re
 
 from fastapi import APIRouter, HTTPException
 
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 from app.models.schemas import SearchRequest, SearchResult, QueryRequest, QueryResponse
 from app.search.hybrid import hybrid_search, index_page_fts
 from app.search.embeddings import store_embedding
@@ -95,8 +95,7 @@ async def archive_answer(req: dict):
     file_path.write_text(frontmatter + content, encoding="utf-8")
 
     # 写入数据库
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         await db.execute(
             """INSERT OR REPLACE INTO wiki_pages
                (page_id, title, category, source_count)
@@ -114,9 +113,6 @@ async def archive_answer(req: dict):
                 ),
             ),
         )
-        await db.commit()
-    finally:
-        await db.close()
 
     # FTS 索引
     await index_page_fts(page_id, title, content)

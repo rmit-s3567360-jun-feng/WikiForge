@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.config import get_wiki_root
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 
 CATEGORIES = ["entities", "concepts", "topics", "sources"]
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
@@ -19,8 +19,7 @@ _TIME_SENSITIVE_WORDS = [
 
 async def check_orphan_pages() -> list[dict]:
     """查找 0 个入链的页面（无其他页面引用它）"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         # 所有有 wiki 文件的页面
         wiki_root = get_wiki_root()
         all_pages: set[str] = set()
@@ -47,8 +46,6 @@ async def check_orphan_pages() -> list[dict]:
                 "issue": "没有任何其他页面引用此页面",
             })
         return orphans
-    finally:
-        await db.close()
 
 
 async def check_dangling_links() -> list[dict]:
@@ -127,8 +124,7 @@ async def check_stale_pages(days: int = 180) -> list[dict]:
 
 async def check_missing_entities() -> list[dict]:
     """查找多个文档提到但没有对应 entity 页面的名称"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         wiki_root = get_wiki_root()
 
         # 收集已有的 entity 页面名称
@@ -169,8 +165,6 @@ async def check_missing_entities() -> list[dict]:
                     "issue": f"在 {count} 个文档段落中被提及，但没有对应的 entity 页面",
                 })
         return issues[:20]  # 最多返回 20 个建议
-    finally:
-        await db.close()
 
 
 async def run_full_lint() -> dict:

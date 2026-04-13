@@ -1,12 +1,12 @@
 """嵌入生成与管理 — bge-small-zh 本地模型 + sqlite-vec"""
 
-import json
 import struct
-from pathlib import Path
 from typing import Optional
 
+import numpy as np
+
 from app.config import get_config
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 
 # 延迟加载模型（首次调用时初始化）
 _model = None
@@ -51,16 +51,12 @@ async def store_embedding(page_id: str, text: str) -> None:
     embedding = embed_text(text)
     blob = _floats_to_blob(embedding)
 
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         await db.execute(
             """INSERT OR REPLACE INTO page_embeddings (page_id, embedding, updated_at)
                VALUES (?, ?, datetime('now'))""",
             (page_id, blob),
         )
-        await db.commit()
-    finally:
-        await db.close()
 
 
 async def store_embeddings_batch(items: list[tuple[str, str]]) -> None:
@@ -72,8 +68,7 @@ async def store_embeddings_batch(items: list[tuple[str, str]]) -> None:
     texts = [i[1] for i in items]
     embeddings = embed_texts(texts)
 
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         for page_id, emb in zip(page_ids, embeddings):
             blob = _floats_to_blob(emb)
             await db.execute(
@@ -81,9 +76,6 @@ async def store_embeddings_batch(items: list[tuple[str, str]]) -> None:
                    VALUES (?, ?, datetime('now'))""",
                 (page_id, blob),
             )
-        await db.commit()
-    finally:
-        await db.close()
 
 
 async def search_by_vector(query: str, top_k: int = 10) -> list[tuple[str, float]]:
@@ -93,24 +85,19 @@ async def search_by_vector(query: str, top_k: int = 10) -> list[tuple[str, float
     """
     query_embedding = embed_text(query)
 
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         rows = await db.execute_fetchall(
             "SELECT page_id, embedding FROM page_embeddings"
         )
-    finally:
-        await db.close()
 
     if not rows:
         return []
 
-    # 计算余弦相似度（嵌入已归一化，点积即余弦相似度）
-    results = []
-    for row in rows:
-        page_id = row[0]
-        stored_emb = _blob_to_floats(row[1])
-        score = sum(a * b for a, b in zip(query_embedding, stored_emb))
-        results.append((page_id, score))
+    # numpy 批量计算余弦相似度（嵌入已归一化，点积即余弦相似度）
+    page_ids = [row[0] for row in rows]
+    embeddings_matrix = np.array([_blob_to_floats(row[1]) for row in rows])
+    query_vec = np.array(query_embedding)
+    scores = embeddings_matrix @ query_vec
 
-    results.sort(key=lambda x: x[1], reverse=True)
-    return results[:top_k]
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    return [(page_ids[i], float(scores[i])) for i in top_indices]

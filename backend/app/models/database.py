@@ -1,6 +1,7 @@
 """SQLite 数据库初始化与连接管理"""
 
 import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -137,3 +138,17 @@ async def get_db() -> aiosqlite.Connection:
     db = await aiosqlite.connect(str(db_path))
     db.row_factory = aiosqlite.Row
     return db
+
+
+@asynccontextmanager
+async def get_db_ctx():
+    """异步数据库连接 context manager — 自动 commit/rollback + close"""
+    db = await get_db()
+    try:
+        yield db
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+    finally:
+        await db.close()

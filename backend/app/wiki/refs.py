@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from app.config import get_wiki_root
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 
 CATEGORIES = ["entities", "concepts", "topics", "sources"]
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
@@ -77,8 +77,7 @@ def extract_refs(
 async def rebuild_refs_for_pages(page_ids: list[str]) -> None:
     """增量更新指定页面的引用"""
     wiki_root = get_wiki_root()
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         # 1. 删除这些页面作为 from_page_id 的旧引用
         for pid in page_ids:
             await db.execute(
@@ -104,10 +103,6 @@ async def rebuild_refs_for_pages(page_ids: list[str]) -> None:
                     (from_id, to_id, ctx),
                 )
 
-        await db.commit()
-    finally:
-        await db.close()
-
 
 async def rebuild_all_refs() -> None:
     """全量重建：清空 page_refs 表，扫描所有页面重新写入"""
@@ -121,12 +116,8 @@ async def rebuild_all_refs() -> None:
         for md_file in cat_dir.glob("*.md"):
             all_page_ids.append(f"{cat}/{md_file.stem}")
 
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         await db.execute("DELETE FROM page_refs")
-        await db.commit()
-    finally:
-        await db.close()
 
     if all_page_ids:
         await rebuild_refs_for_pages(all_page_ids)

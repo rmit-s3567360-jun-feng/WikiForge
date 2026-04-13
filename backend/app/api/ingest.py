@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from app.config import get_uploads_dir, get_config
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 from app.ingest.tasks import (
     create_task, get_task, get_all_tasks,
     complete_task, fail_task, TaskStatus,
@@ -68,15 +68,12 @@ async def ingest_file(file: UploadFile = File(...)):
     content_hash = hashlib.sha256(content).hexdigest()
 
     # 前置去重检查：相同内容的文件直接返回，不启动后台任务
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         row = await db.execute(
             "SELECT source_id, filename FROM sources WHERE content_hash = ?",
             (content_hash,),
         )
         existing = await row.fetchone()
-    finally:
-        await db.close()
 
     if existing:
         return {
@@ -133,8 +130,7 @@ async def list_ingest_tasks():
 @router.delete("/ingest/{source_id}")
 async def delete_source(source_id: str):
     """删除一个已导入的文档及其生成的 Wiki 内容"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         # 1. 查找 source 是否存在
         row = await db.execute(
             "SELECT source_id, filename FROM sources WHERE source_id = ?",
@@ -199,10 +195,6 @@ async def delete_source(source_id: str):
             }, ensure_ascii=False)),
         )
 
-        await db.commit()
-    finally:
-        await db.close()
-
     # 8. 删除独占页面的 wiki 文件
     from app.config import get_wiki_root
     wiki_root = get_wiki_root()
@@ -252,8 +244,7 @@ async def delete_source(source_id: str):
 @router.get("/ingest/history")
 async def get_ingest_history(limit: int = 20):
     """获取最近的导入记录（从数据库）"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         rows = await db.execute_fetchall(
             """SELECT source_id, filename, document_type, topic_tags,
                       summary_one_line, ingested_at
@@ -287,8 +278,6 @@ async def get_ingest_history(limit: int = 20):
                     "issues": json.loads(er[3]) if er[3] else [],
                     "summary": er[4],
                 }
-    finally:
-        await db.close()
 
     results = []
     for row in rows:

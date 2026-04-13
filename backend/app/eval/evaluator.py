@@ -8,7 +8,7 @@ from pathlib import Path
 from app.config import get_wiki_root
 from app.llm.router import get_provider
 from app.llm.prompts import EVAL_SYSTEM, EVAL_USER
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +107,7 @@ async def eval_ingest(
 
 async def _save_report(source_id: str, report: dict):
     """将 eval 结果存入数据库"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         await db.execute(
             """INSERT OR REPLACE INTO eval_reports
                (source_id, faithfulness, completeness, issues, summary)
@@ -121,15 +120,11 @@ async def _save_report(source_id: str, report: dict):
                 report["summary"],
             ),
         )
-        await db.commit()
-    finally:
-        await db.close()
 
 
 async def get_eval_report(source_id: str) -> dict | None:
     """从数据库读取 eval 报告"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         row = await db.execute(
             "SELECT * FROM eval_reports WHERE source_id = ?",
             (source_id,),
@@ -145,14 +140,11 @@ async def get_eval_report(source_id: str) -> dict | None:
             "summary": r["summary"],
             "evaluated_at": r["evaluated_at"],
         }
-    finally:
-        await db.close()
 
 
 async def get_all_eval_stats() -> dict:
     """获取所有 eval 的汇总统计"""
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         row = await db.execute(
             """SELECT COUNT(*) as total,
                       AVG(faithfulness) as avg_faith,
@@ -193,5 +185,3 @@ async def get_all_eval_stats() -> dict:
                 for row in rows
             ],
         }
-    finally:
-        await db.close()

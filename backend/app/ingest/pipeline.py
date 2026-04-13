@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.config import get_wiki_root
-from app.models.database import get_db
+from app.models.database import get_db_ctx
 from app.models.schemas import IngestResponse
 from app.ingest.classifier import classify_document
 from app.ingest.segmenter import segment_document
@@ -104,15 +104,13 @@ async def run_ingest_pipeline(
     file_type = _detect_file_type(file_path)
 
     # 1. 去重检查
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         row = await db.execute(
             "SELECT source_id FROM sources WHERE content_hash = ?",
             (content_hash,),
         )
         existing = await row.fetchone()
         if existing:
-            await db.close()
             return IngestResponse(
                 source_id=existing["source_id"],
                 filename=filename,
@@ -122,8 +120,6 @@ async def run_ingest_pipeline(
                 wiki_pages_created=[],
                 wiki_pages_updated=[],
             )
-    finally:
-        await db.close()
 
     # 2. 文本提取
     _update(TaskStatus.EXTRACTING)
@@ -237,8 +233,7 @@ async def run_ingest_pipeline(
 
     # 10. 写入数据库
     _update(TaskStatus.SAVING)
-    db = await get_db()
-    try:
+    async with get_db_ctx() as db:
         await db.execute(
             """INSERT INTO sources
                (source_id, filename, file_type, content_hash, document_type,
@@ -323,10 +318,6 @@ async def run_ingest_pipeline(
                 }, ensure_ascii=False),
             ),
         )
-
-        await db.commit()
-    finally:
-        await db.close()
 
     # 10.5 更新交叉引用
     all_affected_pages = wiki_result["pages_created"] + wiki_result["pages_updated"]
