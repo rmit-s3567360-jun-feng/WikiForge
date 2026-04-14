@@ -79,7 +79,7 @@ wiki-root/
 
 ```bash
 git clone https://github.com/stardust-mem/WikiForge.git
-cd wikiforge
+cd WikiForge
 ```
 
 ### 2. Configure API keys
@@ -138,7 +138,7 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install -e "."
 
 cp config.example.yaml config.yaml
 # Fill in your API keys in config.yaml
@@ -157,6 +157,11 @@ npm run dev
 ```
 
 Frontend runs at `http://localhost:5173`. API requests are proxied to `:8000` via Vite config.
+
+> **Embedding model download slow?** Set the HuggingFace mirror (especially useful in China):
+> ```bash
+> export HF_ENDPOINT=https://hf-mirror.com
+> ```
 
 ---
 
@@ -283,7 +288,7 @@ The **Lint** page scans the wiki for broken links, orphan pages, and format erro
 │   ├── wiki-root/     # Markdown knowledge base (user data, git-ignored)
 │   ├── data/          # SQLite DB + search index
 │   ├── config.example.yaml
-│   └── requirements.txt
+│   └── pyproject.toml
 ├── frontend/
 │   └── src/
 │       ├── pages/     # IngestPage / WikiPage / SearchPage / LintPage
@@ -303,6 +308,12 @@ The **Lint** page scans the wiki for broken links, orphan pages, and format erro
 - [ ] Semantic tag deduplication (synonym merging)
 - [ ] Mobile responsive layout
 - [ ] Batch import
+
+---
+
+## For AI Agents
+
+If you are an AI agent (Claude Code, Cursor, Copilot, etc.) working on this repository, read [`AGENTS.md`](AGENTS.md) first. It contains the authoritative reference for repo layout, configuration, deployment commands, architecture notes, and common issues — optimized for agent consumption.
 
 ---
 
@@ -362,7 +373,7 @@ Issues and PRs are welcome.
 ```bash
 # 1. 克隆
 git clone https://github.com/stardust-mem/WikiForge.git
-cd wikiforge
+cd WikiForge
 
 # 2. 配置 API Keys
 cp .env.example .env
@@ -379,6 +390,11 @@ docker compose up -d
 访问 [http://localhost](http://localhost)
 
 > 首次启动会下载 embedding 模型并安装依赖，需要几分钟。
+>
+> **国内网络下载 embedding 模型较慢？** 设置镜像：
+> ```bash
+> export HF_ENDPOINT=https://hf-mirror.com
+> ```
 
 ### 本地开发
 
@@ -386,7 +402,7 @@ docker compose up -d
 # 后端
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e "."
 cp config.example.yaml config.yaml   # 填入 API keys
 uvicorn app.main:app --reload --port 8000
 
