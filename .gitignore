@@ -14,7 +14,7 @@ frontend/dist/
 backend/data/wiki.db
 backend/data/uploads/*
 !backend/data/uploads/.gitkeep
-backend/data/bm25_index/
+backend/data/bm25_index/*
 
 # Config secrets
 backend/config.yaml
