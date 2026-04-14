@@ -186,7 +186,18 @@ llm:
   embedding_model: "BAAI/bge-small-zh-v1.5"
 ```
 
-**Minimal config (MiniMax only):**
+> **Provider support status:**
+>
+> | Provider | Status | Notes |
+> |----------|--------|-------|
+> | MiniMax | ✅ Tested | Primary development target |
+> | DeepSeek / Kimi / OpenAI | ⚠️ Untested | Uses the same OpenAI-compatible protocol — should work in theory, but not verified |
+> | Ollama | ⚠️ Untested | Code path exists, community feedback welcome |
+> | Claude (Vision) | ⚠️ Untested | Separate implementation for image-heavy PDFs, not independently verified |
+>
+> If you successfully use a provider not listed as tested, please open an Issue or PR to share your config — it helps everyone.
+
+**Minimal config (MiniMax only) — recommended starting point:**
 
 ```yaml
 llm:
@@ -200,7 +211,7 @@ llm:
   vision_api_key: ""
 ```
 
-**Using DeepSeek / Kimi / any OpenAI-compatible API:**
+**DeepSeek / Kimi / any OpenAI-compatible API _(untested)_:**
 
 ```yaml
 llm:
@@ -210,7 +221,7 @@ llm:
   cloud_base_url: "https://api.deepseek.com/v1"
 ```
 
-**Using Ollama for local quality evaluation:**
+**Ollama for local quality evaluation _(untested)_:**
 
 ```bash
 ollama pull qwen3.5:9b
@@ -400,7 +411,13 @@ llm:
   local_api_key: "your_key"
 ```
 
-也支持 DeepSeek、Kimi、OpenAI 兼容接口，以及 Ollama 本地模型。
+> **支持状态说明：**
+> - ✅ MiniMax — 已测试，主要开发目标
+> - ⚠️ DeepSeek / Kimi / OpenAI — 协议兼容，理论可用，**未实测**
+> - ⚠️ Ollama — 代码路径已实现，**未实测**
+> - ⚠️ Claude Vision — 独立实现，**未独立验证**
+>
+> 如果你成功接入了其他 provider，欢迎提 Issue 分享配置。
 
 ### 使用方法
 
